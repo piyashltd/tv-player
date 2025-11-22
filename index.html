@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>StreamFlow IPTV</title>
+    <meta name="description" content="A client-side, header-capable M3U8 player for web and Android TV.">
+
+    <!-- Video.js CSS -->
+    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+    
+    <!-- Tailwind CSS (via CDN for standalone portability) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #e50914; /* Netflix Red-ish */
+            --bg-dark: #141414;
+            --bg-card: #1f1f1f;
+            --focus-ring: #ffffff;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #fff;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Scrollbar Hide */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+
+        /* --- Android TV / Keyboard Focus Styles --- */
+        .focusable {
+            transition: transform 0.2s, box-shadow 0.2s, border 0.2s;
+            cursor: pointer;
+            outline: none;
+            border: 2px solid transparent;
+        }
+
+        .focusable:focus, .focusable:hover {
+            transform: scale(1.05);
+            border-color: var(--primary);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        /* --- VideoJS Customization --- */
+        .video-js {
+            width: 100%;
+            height: 100%;
+            font-family: 'Inter', sans-serif;
+        }
+        .video-js .vjs-big-play-button {
+            background-color: rgba(229, 9, 20, 0.8);
+            border: none;
+            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            line-height: 80px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .vjs-control-bar {
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent) !important;
+        }
+
+        /* --- Layout Utilities --- */
+        .grid-card {
+            aspect-ratio: 16/9;
+            background-size: cover;
+            background-position: center;
+            background-color: #000;
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .grid-card .overlay {
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%);
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 10px;
+        }
+
+        /* Loaders */
+        .loader {
+            border: 4px solid rgba(255,255,255,0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: var(--primary);
+            animation: spin 1s ease infinite;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Hide/Show Logic */
+        .hidden-page { display: none !important; }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- ================= APP HEADER ================= -->
+    <header class="flex items-center justify-between px-6 py-4 bg-black/50 backdrop-blur-md sticky top-0 z-50 border-b border-gray-800">
+        <div class="flex items-center gap-3">
+            <i class="fas fa-play-circle text-red-600 text-3xl"></i>
+            <h1 class="text-xl font-bold tracking-wide">StreamFlow</h1>
+        </div>
+        <div class="flex gap-4">
+            <button id="btn-settings" class="focusable text-gray-300 hover:text-white p-2 rounded-full">
+                <i class="fas fa-cog text-xl"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- ================= SETTINGS MODAL ================= -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex items-center justify-center">
+        <div class="bg-[#1f1f1f] p-6 rounded-lg max-w-md w-full border border-gray-700">
+            <h2 class="text-xl font-bold mb-4">Settings</h2>
+            
+            <div class="space-y-4">
+                <!-- CORS Proxy -->
+                <div>
+                    <label class="flex items-center justify-between cursor-pointer group">
+                        <span class="text-gray-300">Enable CORS Proxy</span>
+                        <input type="checkbox" id="setting-cors" class="w-5 h-5 accent-red-600">
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1">Routes traffic through a public proxy to bypass CORS restrictions.</p>
+                </div>
+
+                <!-- User Agent Warning -->
+                <div class="p-3 bg-yellow-900/20 border border-yellow-700/50 rounded text-sm text-yellow-200">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    Note: 'User-Agent' headers cannot be modified by the browser directly. To spoof agents, the CORS proxy must support it.
+                </div>
+
+                <!-- Clear Data -->
+                <button id="btn-clear-data" class="focusable w-full bg-red-900/50 hover:bg-red-800 text-red-100 py-2 rounded border border-red-700">
+                    Clear Saved Data
+                </button>
+            </div>
+
+            <button id="close-settings" class="focusable mt-6 w-full bg-white text-black font-bold py-2 rounded">Close</button>
+        </div>
+    </div>
+
+    <!-- ================= HOME PAGE (Playlist Management) ================= -->
+    <main id="page-home" class="flex-1 overflow-y-auto p-4 md:p-8">
+        
+        <!-- Input Section -->
+        <div id="input-section" class="max-w-3xl mx-auto text-center py-10 space-y-6 transition-all duration-500">
+            <h2 class="text-3xl md:text-4xl font-bold mb-2">Load your Playlist</h2>
+            <p class="text-gray-400">Supports M3U, M3U8. Paste a URL or upload a file.</p>
+            
+            <div class="flex flex-col md:flex-row gap-3">
+                <input type="text" id="playlist-url" placeholder="https://example.com/playlist.m3u" 
+                    class="focusable flex-1 bg-[#2a2a2a] border border-gray-700 text-white px-4 py-3 rounded-lg focus:border-red-600 outline-none">
+                <button id="btn-load-url" class="focusable bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors">
+                    Load URL
+                </button>
+            </div>
+
+            <div class="relative">
+                <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-800"></div></div>
+                <div class="relative flex justify-center"><span class="bg-[#141414] px-2 text-gray-500 text-sm">OR</span></div>
+            </div>
+
+            <label class="focusable inline-flex flex-col items-center px-6 py-4 bg-[#2a2a2a] text-blue rounded-lg shadow-lg tracking-wide border border-gray-700 cursor-pointer hover:bg-[#333] hover:text-white transition-colors">
+                <i class="fas fa-cloud-upload-alt text-2xl mb-1"></i>
+                <span class="text-sm leading-normal">Select local .m3u file</span>
+                <input type='file' id="file-upload" class="hidden" accept=".m3u,.m3u8" />
+            </label>
+
+            <!-- Header Config (Advanced) -->
+            <details class="text-left bg-[#1f1f1f] rounded-lg p-4 border border-gray-700">
+                <summary class="cursor-pointer font-semibold text-gray-300">Advanced: Custom Headers</summary>
+                <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <input type="text" id="header-referer" placeholder="Referer (e.g. https://site.com)" class="focusable w-full bg-[#2a2a2a] border border-gray-600 p-2 rounded text-sm">
+                    <input type="text" id="header-origin" placeholder="Origin" class="focusable w-full bg-[#2a2a2a] border border-gray-600 p-2 rounded text-sm">
+                    <!-- Note: User-Agent is intentionally omitted as browser fetch API forbids setting it unsafe -->
+                </div>
+            </details>
+        </div>
+
+        <!-- Channel Grid (Hidden initially) -->
+        <div id="channel-container" class="hidden max-w-7xl mx-auto">
+            <div class="flex justify-between items-center mb-6">
+                <div class="flex gap-2 overflow-x-auto pb-2" id="category-filter">
+                    <button class="focusable bg-red-600 text-white px-4 py-1 rounded-full text-sm whitespace-nowrap active-category">All</button>
+                    <!-- Categories injected here -->
+                </div>
+                <div class="text-sm text-gray-400" id="channel-count">0 Channels</div>
+            </div>
+
+            <div id="grid-output" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                <!-- Channels injected here -->
+            </div>
+        </div>
+    </main>
+
+    <!-- ================= PLAYER PAGE ================= -->
+    <main id="page-player" class="hidden-page fixed inset-0 z-50 bg-black">
+        <!-- Video Container -->
+        <div class="relative w-full h-full">
+            <video-js id="video-player" class="vjs-default-skin vjs-big-play-centered" controls preload="auto"></video-js>
+            
+            <!-- Custom Overlay Controls (Back Button) -->
+            <div id="player-overlay" class="absolute top-0 left-0 w-full p-6 bg-gradient-to-b from-black/80 to-transparent pointer-events-none transition-opacity duration-300">
+                <button id="btn-back" class="focusable pointer-events-auto text-white hover:text-red-500 transition-colors flex items-center gap-2 bg-black/30 px-4 py-2 rounded-lg backdrop-blur-sm">
+                    <i class="fas fa-arrow-left"></i> <span>Back to List</span>
+                </button>
+                <h2 id="player-title" class="text-xl font-bold mt-2 ml-1 text-white drop-shadow-md">Channel Name</h2>
+            </div>
+        </div>
+    </main>
+
+    <!-- Video.js Script -->
+    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+
+    <!-- Application Logic -->
+    <script>
+        // ================= STATE MANAGEMENT =================
+        const AppState = {
+            channels: [],
+            currentCategory: 'All',
+            proxyEnabled: localStorage.getItem('iptv_proxy') === 'true',
+            headers: JSON.parse(localStorage.getItem('iptv_headers') || '{}'),
+            lastPlayed: JSON.parse(localStorage.getItem('iptv_last_played') || 'null')
+        };
+
+        // ================= DOM ELEMENTS =================
+        const els = {
+            home: document.getElementById('page-home'),
+            player: document.getElementById('page-player'),
+            inputSection: document.getElementById('input-section'),
+            channelContainer: document.getElementById('channel-container'),
+            grid: document.getElementById('grid-output'),
+            categories: document.getElementById('category-filter'),
+            videoElement: document.getElementById('video-player'),
+            settingsModal: document.getElementById('settings-modal')
+        };
+
+        // ================= PARSER ENGINE =================
+        const M3UParser = {
+            parse: (content) => {
+                const lines = content.split('\n');
+                const playlist = [];
+                let currentItem = {};
+
+                lines.forEach(line => {
+                    line = line.trim();
+                    if (!line) return;
+
+                    if (line.startsWith('#EXTINF:')) {
+                        // Reset current item
+                        currentItem = {};
+                        
+                        // Extract Meta
+                        const tvgId = line.match(/tvg-id="([^"]*)"/);
+                        const tvgLogo = line.match(/tvg-logo="([^"]*)"/);
+                        const groupTitle = line.match(/group-title="([^"]*)"/);
+                        const name = line.substring(line.lastIndexOf(',') + 1).trim();
+
+                        currentItem.id = tvgId ? tvgId[1] : null;
+                        currentItem.logo = tvgLogo ? tvgLogo[1] : null;
+                        currentItem.group = groupTitle ? groupTitle[1] : 'Uncategorized';
+                        currentItem.name = name || 'Unknown Channel';
+                    } else if (!line.startsWith('#')) {
+                        // It's a URL
+                        if (currentItem.name) {
+                            currentItem.url = line;
+                            playlist.push(currentItem);
+                        }
+                    }
+                });
+                return playlist;
+            }
+        };
+
+        // ================= VIDEO PLAYER CONTROLLER =================
+        let player;
+
+        function initPlayer() {
+            if (player) return;
+
+            player = videojs('video-player', {
+                fluid: true,
+                html5: {
+                    vhs: {
+                        overrideNative: true,
+                        // Hook for headers
+                        xhr: {
+                            beforeRequest: function(options) {
+                                // Inject headers if proxy is NOT used (direct connection)
+                                // Note: Browsers block unsafe headers like User-Agent here.
+                                if (AppState.headers.referer) {
+                                    // Attempt to set, will likely fail without proxy
+                                    // options.headers['Referer'] = AppState.headers.referer; 
+                                }
+                                return options;
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Error handling
+            player.on('error', () => {
+                console.error("Video Error:", player.error());
+            });
+            
+            // Persistence: Save position
+            player.on('timeupdate', () => {
+                if(player.currentTime() > 10) { // Only save after 10s
+                     localStorage.setItem('iptv_resume_time', player.currentTime());
+                }
+            });
+        }
+
+        function playChannel(channel) {
+            // 1. UI Switch
+            els.home.classList.add('hidden-page');
+            els.player.classList.remove('hidden-page');
+            document.getElementById('player-title').innerText = channel.name;
+
+            // 2. Init VideoJS
+            initPlayer();
+
+            // 3. Construct URL based on Proxy/Headers
+            let streamUrl = channel.url;
+            
+            if (AppState.proxyEnabled) {
+                // Using corsproxy.io as an example of a generic public proxy
+                // For production, self-host a proxy to secure tokens
+                streamUrl = `https://corsproxy.io/?${encodeURIComponent(channel.url)}`;
+            }
+
+            // 4. Load Stream
+            player.src({
+                src: streamUrl,
+                type: streamUrl.includes('.m3u8') ? 'application/x-mpegURL' : 'video/mp4'
+            });
+
+            player.play();
+            
+            // 5. Restore time if same channel
+            const lastUrl = localStorage.getItem('iptv_last_url');
+            if(lastUrl === channel.url) {
+                const time = parseFloat(localStorage.getItem('iptv_resume_time'));
+                if(time && time > 0) player.currentTime(time);
+            }
+            
+            localStorage.setItem('iptv_last_url', channel.url);
+            els.videoElement.focus(); // Focus player for keyboard controls
+        }
+
+        function closePlayer() {
+            player.pause();
+            els.player.classList.add('hidden-page');
+            els.home.classList.remove('hidden-page');
+            // Re-focus the last grid item for TV navigation
+            const lastFocused = document.querySelector('.grid-card:focus') || document.querySelector('.grid-card');
+            if (lastFocused) lastFocused.focus();
+        }
+
+        // ================= UI RENDERING =================
+        function renderChannels(category = 'All') {
+            els.grid.innerHTML = '';
+            
+            const filtered = category === 'All' 
+                ? AppState.channels 
+                : AppState.channels.filter(c => c.group === category);
+
+            document.getElementById('channel-count').innerText = `${filtered.length} Channels`;
+
+            // Use DocumentFragment for performance
+            const frag = document.createDocumentFragment();
+
+            filtered.forEach((channel, index) => {
+                const card = document.createElement('div');
+                card.className = 'grid-card focusable shadow-lg group';
+                card.tabIndex = 0; // Make focusable
+                
+                // Fallback logo
+                const logoUrl = channel.logo || 'https://via.placeholder.com/300x169/000000/FFFFFF/?text=' + encodeURIComponent(channel.name.substring(0,2));
+
+                card.innerHTML = `
+                    <img src="${logoUrl}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy" onerror="this.src='https://via.placeholder.com/300x169/333/FFF?text=No+Img'">
+                    <div class="overlay">
+                        <h3 class="font-bold text-sm truncate">${channel.name}</h3>
+                        <p class="text-xs text-gray-400 truncate">${channel.group}</p>
+                    </div>
+                `;
+
+                // Event Listeners
+                card.addEventListener('click', () => playChannel(channel));
+                card.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') playChannel(channel);
+                });
+
+                frag.appendChild(card);
+            });
+
+            els.grid.appendChild(frag);
+        }
+
+        function renderCategories() {
+            const groups = [...new Set(AppState.channels.map(c => c.group))].sort();
+            
+            // Keep "All" button
+            const allBtn = els.categories.firstElementChild;
+            els.categories.innerHTML = '';
+            els.categories.appendChild(allBtn);
+
+            groups.forEach(g => {
+                if(!g) return;
+                const btn = document.createElement('button');
+                btn.className = `focusable bg-[#2a2a2a] hover:bg-[#444] text-gray-300 px-4 py-1 rounded-full text-sm whitespace-nowrap transition-colors border border-gray-700`;
+                btn.innerText = g;
+                btn.tabIndex = 0;
+                btn.onclick = () => {
+                    // Update active state
+                    document.querySelectorAll('#category-filter button').forEach(b => {
+                        b.classList.remove('bg-red-600', 'text-white');
+                        b.classList.add('bg-[#2a2a2a]', 'text-gray-300');
+                    });
+                    btn.classList.remove('bg-[#2a2a2a]', 'text-gray-300');
+                    btn.classList.add('bg-red-600', 'text-white');
+                    
+                    renderChannels(g);
+                };
+                els.categories.appendChild(btn);
+            });
+        }
+
+        // ================= INPUT HANDLING =================
+        function loadPlaylist(content) {
+            const channels = M3UParser.parse(content);
+            if (channels.length === 0) {
+                alert("No channels found in playlist.");
+                return;
+            }
+
+            AppState.channels = channels;
+            
+            // UI Transition
+            els.inputSection.classList.add('hidden', 'md:hidden'); // Hide input
+            els.channelContainer.classList.remove('hidden');
+            
+            renderCategories();
+            renderChannels();
+            
+            // Save headers config
+            AppState.headers = {
+                referer: document.getElementById('header-referer').value,
+                origin: document.getElementById('header-origin').value
+            };
+            localStorage.setItem('iptv_headers', JSON.stringify(AppState.headers));
+        }
+
+        // URL Load
+        document.getElementById('btn-load-url').addEventListener('click', async () => {
+            const url = document.getElementById('playlist-url').value;
+            if (!url) return;
+
+            const btn = document.getElementById('btn-load-url');
+            const originalText = btn.innerText;
+            btn.innerText = 'Loading...';
+            
+            try {
+                let fetchUrl = url;
+                // Always proxy the playlist fetch to avoid CORS on the text file itself
+                if(AppState.proxyEnabled) {
+                    fetchUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+                }
+
+                const res = await fetch(fetchUrl);
+                const text = await res.text();
+                loadPlaylist(text);
+            } catch (e) {
+                alert("Failed to load playlist. Ensure CORS Proxy is enabled in settings if the server blocks browser requests.");
+                console.error(e);
+            } finally {
+                btn.innerText = originalText;
+            }
+        });
+
+        // File Load
+        document.getElementById('file-upload').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => loadPlaylist(e.target.result);
+            reader.readAsText(file);
+        });
+
+        // Settings Toggle
+        document.getElementById('btn-settings').addEventListener('click', () => {
+            els.settingsModal.classList.remove('hidden');
+            document.getElementById('setting-cors').checked = AppState.proxyEnabled;
+        });
+
+        document.getElementById('close-settings').addEventListener('click', () => {
+            els.settingsModal.classList.add('hidden');
+        });
+
+        document.getElementById('setting-cors').addEventListener('change', (e) => {
+            AppState.proxyEnabled = e.target.checked;
+            localStorage.setItem('iptv_proxy', e.target.checked);
+        });
+        
+        document.getElementById('btn-clear-data').addEventListener('click', () => {
+            localStorage.clear();
+            location.reload();
+        });
+
+        document.getElementById('btn-back').addEventListener('click', closePlayer);
+
+        // ================= KEYBOARD NAVIGATION (ANDROID TV) =================
+        function handleKeyNav(e) {
+            // Basic D-pad logic
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                const focusable = Array.from(document.querySelectorAll('.focusable:not(:disabled)'))
+                    .filter(el => el.offsetParent !== null); // Only visible elements
+                
+                const index = focusable.indexOf(document.activeElement);
+                
+                if (index === -1 && focusable.length > 0) {
+                    focusable[0].focus();
+                    e.preventDefault();
+                }
+                // Note: Default browser behavior for arrows usually handles grid nav well enough.
+                // We rely on that + flex/grid layout. 
+                // We only intervene if focus is lost.
+            }
+            
+            // Back button on remote
+            if (e.key === 'Escape' || e.key === 'Backspace') {
+                if (!els.player.classList.contains('hidden-page')) {
+                    closePlayer();
+                } else if (!els.settingsModal.classList.contains('hidden')) {
+                     els.settingsModal.classList.add('hidden');
+                }
+            }
+        }
+
+        document.addEventListener('keydown', handleKeyNav);
+
+    </script>
+</body>
+</html>
