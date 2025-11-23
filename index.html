@@ -14,10 +14,19 @@
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- Google Fonts -->
+    <!-- Google Fonts (Backups) -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 
     <style>
+        /* --- 1. কাস্টম ফন্ট যোগ করা হয়েছে --- */
+        @font-face {
+            font-family: 'CustomFont';
+            /* লক্ষ্য করুন: ফাইলের পাশে 'fonts' ফোল্ডারের ভিতর 'font1.ttf' থাকতে হবে */
+            src: url('fonts/font1.ttf') format('truetype'); 
+            font-weight: normal;
+            font-style: normal;
+        }
+
         :root {
             --primary: #e50914;
             --bg-dark: #141414;
@@ -27,7 +36,8 @@
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            /* --- 2. বডি ফন্ট পরিবর্তন করা হয়েছে --- */
+            font-family: 'CustomFont', 'Inter', sans-serif;
             background-color: var(--bg-dark);
             color: #fff;
             overflow-x: hidden;
@@ -54,7 +64,8 @@
         .video-js { 
             width: 100%; 
             height: 100%; 
-            font-family: 'Inter', sans-serif;
+            /* --- 3. প্লেয়ার ফন্ট পরিবর্তন করা হয়েছে --- */
+            font-family: 'CustomFont', 'Inter', sans-serif;
         }
 
         /* Big Play Button - Red & Perfectly Centered */
@@ -105,8 +116,7 @@
 
         .hidden-page { display: none !important; }
 
-        /* --- Quality Selector CSS (From your Code A) --- */
-        
+        /* --- Quality Selector CSS --- */
         .vjs-quality-menu {
             display: flex !important; 
             justify-content: center;
@@ -171,7 +181,7 @@
             justify-content: space-between;
             align-items: center;
             transition: background 0.2s;
-            font-family: sans-serif;
+            font-family: 'CustomFont', sans-serif; /* ফন্ট আপডেট */
             text-transform: capitalize;
         }
 
@@ -241,7 +251,7 @@
         </div>
     </main>
 
-    <!-- PLAYER PAGE (With Recommendations) -->
+    <!-- PLAYER PAGE -->
     <main id="page-player" class="hidden-page fixed inset-0 z-50 bg-[#141414] overflow-y-auto">
         <div class="max-w-6xl mx-auto min-h-screen flex flex-col">
             
@@ -253,17 +263,14 @@
                 <h2 id="player-title" class="text-lg font-bold truncate flex-1">Channel Name</h2>
             </div>
 
-            <!-- Video Container (Theater Mode) -->
+            <!-- Video Container -->
             <div class="w-full aspect-video bg-black shadow-2xl relative group">
-                <!-- Added vjs-big-play-centered for better default positioning logic -->
                 <video-js id="video-player" class="vjs-default-skin vjs-big-play-centered" controls preload="auto" playsinline></video-js>
             </div>
 
             <!-- Recommendations Section -->
             <div class="p-4 md:p-6 flex-1">
                 <h3 class="text-gray-300 font-semibold mb-4 border-l-4 border-red-600 pl-3">You might also like</h3>
-                
-                <!-- Suggested Grid -->
                 <div id="related-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <!-- Suggested channels injected here -->
                 </div>
@@ -274,18 +281,16 @@
 
     <!-- SCRIPTS -->
     <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
-    <!-- Important: Quality Levels Plugin -->
     <script src="https://unpkg.com/videojs-contrib-quality-levels@3.0.0/dist/videojs-contrib-quality-levels.min.js"></script>
 
     <script>
-        // --- QUALITY MENU LOGIC (From Code A) ---
+        // --- QUALITY MENU LOGIC ---
         
-        // ১. কোয়ালিটি মেনু বাটন তৈরি
         function createQualityMenuUI(playerInstance) {
             const controlBar = playerInstance.controlBar;
             
             if (controlBar.getChild('qualityMenu')) {
-                return document.querySelector('.vjs-quality-list'); // Already exists
+                return document.querySelector('.vjs-quality-list');
             }
 
             const menuContainer = document.createElement("div");
@@ -331,9 +336,7 @@
             return list;
         }
 
-        // ২. কোয়ালিটি লিস্ট পপুলেট করা
         function resetAndPopulateQualityMenu(playerInstance, listElement) {
-            // Need to wait for quality levels to be available
             const qualityLevels = playerInstance.qualityLevels();
             let availableQualities = [];
             
@@ -342,9 +345,7 @@
             function renderList() {
                 listElement.innerHTML = "";
                 
-                // Auto Option
                 const autoItem = document.createElement("div");
-                // Check if all levels are enabled (implies Auto)
                 const isAuto = qualityLevels.levels_.length > 0 && qualityLevels.levels_.every(l => l.enabled);
                 
                 autoItem.className = `vjs-quality-item ${isAuto ? 'active' : ''}`;
@@ -359,10 +360,8 @@
                 };
                 listElement.appendChild(autoItem);
 
-                // Quality Options
                 availableQualities.forEach(level => {
                     const item = document.createElement("div");
-                    // Check if ONLY this level is enabled
                     const isSelected = !isAuto && level.enabled; 
                     
                     item.className = `vjs-quality-item ${isSelected ? 'active' : ''}`;
@@ -379,21 +378,17 @@
                 });
             }
 
-            // Listen for new quality levels
             qualityLevels.on('addqualitylevel', (event) => {
                 const level = event.qualityLevel;
                 if (level.height && !availableQualities.some(q => q.height === level.height)) {
                     availableQualities.push(level);
-                    // Sort Highest to Lowest
                     availableQualities.sort((a, b) => b.height - a.height); 
                     renderList();
                 }
             });
 
-            // Initial render
             renderList();
         }
-
 
         // --- CONFIGURATION ---
         const PLAYLIST_URL = "https://piyashltd.github.io/all-in-one/index.m3u";
@@ -434,7 +429,6 @@
             } catch (e) {
                 console.error(e);
                 if(!AppState.proxyEnabled) {
-                    // Auto-retry with proxy once
                     AppState.proxyEnabled = true;
                     localStorage.setItem('iptv_proxy', 'true');
                     fetchPlaylist(); 
@@ -483,7 +477,6 @@
 
         function renderCategories() {
             const groups = [...new Set(AppState.channels.map(c => c.group))].sort();
-            // Reset to just "All"
             els.categories.innerHTML = '<button class="bg-red-600 text-white px-4 py-1 rounded-full text-sm font-medium whitespace-nowrap transition-colors focusable" onclick="filterGrid(\'All\', this)">All</button>';
             
             groups.forEach(g => {
@@ -497,14 +490,12 @@
         }
 
         function filterGrid(category, btnElement) {
-            // UI Update
             const buttons = els.categories.querySelectorAll('button');
             buttons.forEach(b => {
                 b.className = 'bg-[#2a2a2a] text-gray-300 px-4 py-1 rounded-full text-sm font-medium whitespace-nowrap border border-gray-700 hover:bg-[#333] transition-colors focusable';
             });
             btnElement.className = 'bg-red-600 text-white px-4 py-1 rounded-full text-sm font-medium whitespace-nowrap border border-red-600 transition-colors focusable';
 
-            // Data Filter
             const filtered = category === 'All' 
                 ? AppState.channels 
                 : AppState.channels.filter(c => c.group === category);
@@ -519,7 +510,7 @@
             channels.forEach(ch => {
                 const div = document.createElement('div');
                 div.className = 'grid-card group focusable';
-                div.tabIndex = 0; // Accessibility
+                div.tabIndex = 0; 
                 
                 const logo = ch.logo || `https://via.placeholder.com/300x169/222/FFF?text=${ch.name.substring(0,1)}`;
                 
@@ -531,9 +522,7 @@
                     </div>
                 `;
 
-                // Click Action
                 div.onclick = () => playChannel(ch);
-                // Keyboard Action
                 div.onkeydown = (e) => { if(e.key === 'Enter') playChannel(ch); };
 
                 frag.appendChild(div);
@@ -545,39 +534,31 @@
         let player;
 
         function playChannel(channel) {
-            // 1. Switch Views
             els.home.classList.add('hidden-page');
             els.playerPage.classList.remove('hidden-page');
             els.playerTitle.innerText = channel.name;
 
-            // 2. Initialize VideoJS
             if(!player) {
                 player = videojs('video-player', { 
                     fluid: true, 
                     html5: { vhs: { overrideNative: true } },
                     autoplay: true,
-                    // Ensure controls are visible
                     controls: true 
                 });
 
-                // --- INTEGRATE QUALITY MENU HERE ---
                 player.ready(() => {
-                   // Create UI Elements
                    const qualityList = createQualityMenuUI(player);
-                   // Setup Listeners
                    resetAndPopulateQualityMenu(player, qualityList);
                 });
             }
 
-            // 3. Set Source
             let src = channel.url;
             if(AppState.proxyEnabled && !src.includes('corsproxy')) {
                 src = `https://corsproxy.io/?${encodeURIComponent(channel.url)}`;
             }
 
-            // Resetting Quality Menu UI for new video
             const list = document.querySelector('.vjs-quality-list');
-            if(list) list.innerHTML = ''; // Clear previous qualities
+            if(list) list.innerHTML = '';
 
             player.src({
                 src: src,
@@ -585,27 +566,20 @@
             });
             player.play();
 
-            // 4. Generate & Render Recommendations (The Requirement)
             generateRecommendations(channel);
-            
-            // Scroll to top of player page
             els.playerPage.scrollTop = 0;
         }
 
         function generateRecommendations(currentChannel) {
-            // Filter by same group first
             let related = AppState.channels.filter(c => c.group === currentChannel.group && c.url !== currentChannel.url);
             
-            // If fewer than 8, fill with random channels
-            if (related.length < 8) {
+            if (related.length < 20) {
                 const others = AppState.channels.filter(c => c.group !== currentChannel.group);
-                // Shuffle others
-                const randomFill = others.sort(() => 0.5 - Math.random()).slice(0, 8 - related.length);
+                const randomFill = others.sort(() => 0.5 - Math.random()).slice(0, 20 - related.length);
                 related = [...related, ...randomFill];
             }
 
-            // Shuffle results slightly so it's not always alphabetical
-            related = related.sort(() => 0.5 - Math.random()).slice(0, 8);
+            related = related.sort(() => 0.5 - Math.random()).slice(0, 20);
 
             renderGrid(related, els.relatedGrid, true);
         }
@@ -633,7 +607,6 @@
 
         document.getElementById('btn-reload').onclick = () => location.reload();
 
-        // Keyboard Back
         document.addEventListener('keydown', (e) => {
             if(e.key === 'Escape' || e.key === 'Backspace') {
                 if(!els.playerPage.classList.contains('hidden-page')) closePlayer();
