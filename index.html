@@ -3,183 +3,248 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>UltraPlay - Watch Live Tv, Movie, Series</title>
+    <title>UltraPlay TV - Live HLS Player</title>
     
-    <!-- Video.js CSS -->
     <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            --primary: #e50914;
-            --bg-dark: #141414;
+            --primary: #e50914; /* Netflix Red */
+            --bg-dark: #0f0f0f;
             --bg-card: #1f1f1f;
+            --focus-border: #ffffff;
         }
 
         body {
             font-family: 'Inter', sans-serif;
             background-color: var(--bg-dark);
-            color: #fff;
-            overflow-x: hidden;
+            color: #e5e5e5;
+            overflow: hidden; /* টিভির জন্য স্ক্রলবার হাইড রাখা ভালো */
+            user-select: none;
         }
 
-        /* Scrollbar Styling */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: var(--bg-dark); }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-
-        /* Focus Styles */
+        /* --- TV FOCUS & NAVIGATION STYLES --- */
+        
+        /* ফোকাস এলিমেন্ট স্টাইল - টিভিতে হাইলাইট হওয়ার জন্য */
         .focusable {
-            transition: transform 0.2s, border-color 0.2s;
             outline: none;
-            border: 2px solid transparent;
-        }
-        .focusable:focus, .focusable:hover {
-            transform: scale(1.02);
-            border-color: var(--primary);
-            z-index: 10;
+            border: 3px solid transparent;
+            transition: all 0.2s ease-in-out;
+            box-sizing: border-box;
+            border-radius: 6px;
+            position: relative;
         }
 
-        /* VideoJS Customization */
-        .video-js { width: 100%; height: 100%; }
+        /* যখন রিমোট দিয়ে ফোকাস করা হবে */
+        .focusable:focus, .focusable.focused {
+            border-color: var(--focus-border);
+            transform: scale(1.05);
+            z-index: 50;
+            background-color: #333;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.8);
+        }
+
+        /* কার্ডের ভেতরের টেক্সট ফোকাস হলে উজ্জ্বল হবে */
+        .focusable:focus .overlay, .focusable.focused .overlay {
+            background: linear-gradient(to top, rgba(229, 9, 20, 0.9) 0%, transparent 100%);
+        }
+        
+        .focusable:focus img, .focusable.focused img {
+            opacity: 1;
+        }
+
+        /* স্ক্রলবার হাইড (টিভির জন্য ক্লিন লুক) */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
+        
+        /* --- VIDEO JS CUSTOMIZATION --- */
+        .video-js { 
+            font-family: 'Inter', sans-serif; 
+        }
+        
         .vjs-big-play-button {
-            background-color: rgba(229, 9, 20, 0.8) !important;
+            background-color: rgba(229, 9, 20, 0.9) !important;
+            border: none !important;
+            width: 80px !important; height: 80px !important;
+            line-height: 80px !important;
             border-radius: 50% !important;
-            width: 70px !important; height: 70px !important;
-            line-height: 70px !important;
-            left: 50% !important; top: 50% !important;
-            transform: translate(-50%, -50%);
+            font-size: 40px !important;
         }
 
-        /* Grid Cards */
+        /* --- QUALITY SELECTOR STYLES (Merged) --- */
+        .vjs-quality-menu {
+            display: flex !important; 
+            justify-content: center;
+            align-items: center;
+        }
+
+        .vjs-quality-button {
+            cursor: pointer;
+            width: 100%; height: 100%;
+        }
+        
+        .vjs-quality-button svg {
+            width: 22px; height: 22px; fill: #fff;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+        }
+
+        .vjs-quality-list {
+            display: none;
+            position: absolute;
+            bottom: 4.5em; /* কন্ট্রোল বারের একটু উপরে */
+            right: 10px;
+            background-color: rgba(15, 15, 15, 0.95);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 5px 0;
+            min-width: 160px;
+            z-index: 200;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.8);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .vjs-quality-item {
+            padding: 12px 20px; /* টিভির জন্য বড় প্যাডিং */
+            font-size: 16px;
+            color: #ccc;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 3px solid transparent;
+        }
+
+        /* কোয়ালিটি লিস্ট ফোকাস স্টাইল */
+        .vjs-quality-item:hover, .vjs-quality-item:focus, .vjs-quality-item.focused {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border-left-color: var(--primary);
+            outline: none;
+        }
+
+        .vjs-quality-item.active {
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        /* Grid Layout Adjustments for TV */
         .grid-card {
             aspect-ratio: 16/9;
             background-color: #000;
-            position: relative;
-            border-radius: 8px;
+            border-radius: 6px;
             overflow: hidden;
-            cursor: pointer;
         }
-        .grid-card img {
-            transition: opacity 0.3s;
-        }
-        .grid-card:hover img { opacity: 1; }
         .grid-card .overlay {
-            background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, transparent 100%);
-            position: absolute; bottom: 0; left: 0; right: 0; padding: 8px;
+            position: absolute; bottom: 0; left: 0; right: 0;
+            padding: 10px;
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%);
         }
-
-        /* Loader */
-        .loader {
-            border: 3px solid rgba(255,255,255,0.1);
-            width: 40px; height: 40px; border-radius: 50%;
-            border-left-color: var(--primary); animation: spin 1s ease infinite;
-        }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
 
         .hidden-page { display: none !important; }
     </style>
 </head>
-<body class="h-screen flex flex-col bg-[#141414]">
+<body class="h-screen w-screen flex flex-col bg-[#0f0f0f]">
 
-    <!-- HEADER -->
-    <header class="flex items-center justify-between px-4 py-3 bg-black/60 backdrop-blur-md sticky top-0 z-50 border-b border-gray-800">
-        <div class="flex items-center gap-2 cursor-pointer" onclick="closePlayer()">
-            <i class="fas fa-play-circle text-red-600 text-2xl"></i>
-            <h1 class="text-lg font-bold tracking-wide">UltraPlay</h1>
+    <header class="flex items-center justify-between px-8 py-4 bg-black/80 sticky top-0 z-40 shadow-lg">
+        <div class="flex items-center gap-3">
+            <i class="fas fa-tv text-red-600 text-3xl"></i>
+            <h1 class="text-2xl font-bold tracking-wider text-white">UltraPlay <span class="text-xs font-normal text-gray-400 ml-1">TV Edition</span></h1>
         </div>
-        <button id="btn-settings" class="text-gray-400 hover:text-white">
-            <i class="fas fa-cog text-xl"></i>
-        </button>
+        <div class="flex gap-4">
+            <button id="btn-settings" class="focusable text-gray-300 hover:text-white p-2 rounded-full">
+                <i class="fas fa-cog text-2xl"></i>
+            </button>
+        </div>
     </header>
 
-    <!-- SETTINGS MODAL -->
-    <div id="settings-modal" class="fixed inset-0 bg-black/90 z-[100] hidden flex items-center justify-center">
-        <div class="bg-[#1f1f1f] p-5 rounded-lg max-w-sm w-full border border-gray-700 mx-4">
-            <h2 class="text-lg font-bold mb-4">Settings</h2>
-            <label class="flex items-center justify-between cursor-pointer mb-4">
-                <span class="text-gray-300">Enable CORS Proxy</span>
-                <input type="checkbox" id="setting-cors" class="w-5 h-5 accent-red-600">
-            </label>
-            <button id="btn-reload" class="w-full bg-red-700 hover:bg-red-600 text-white py-2 rounded mb-3">Reload Playlist</button>
-            <button id="close-settings" class="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 rounded">Close</button>
+    <div id="settings-modal" class="fixed inset-0 bg-black/95 z-[100] hidden flex items-center justify-center">
+        <div class="bg-[#1f1f1f] p-8 rounded-xl max-w-md w-full border border-gray-700">
+            <h2 class="text-2xl font-bold mb-6 text-white">Settings</h2>
+            
+            <div class="space-y-4">
+                <button id="toggle-proxy" class="focusable w-full flex justify-between items-center bg-gray-800 p-4 rounded-lg">
+                    <span>Enable Proxy (CORS)</span>
+                    <i id="proxy-icon" class="fas fa-toggle-off text-2xl text-gray-500"></i>
+                </button>
+
+                <button id="btn-reload" class="focusable w-full bg-red-700 hover:bg-red-600 text-white p-4 rounded-lg font-bold">
+                    Reload Playlist
+                </button>
+                
+                <button id="close-settings" class="focusable w-full bg-gray-700 hover:bg-gray-600 text-white p-4 rounded-lg">
+                    Close
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- MAIN CONTENT (Home) -->
-    <main id="page-home" class="flex-1 overflow-y-auto p-4">
-        <!-- Loader -->
-        <div id="loading-indicator" class="flex flex-col items-center justify-center h-[60vh]">
-            <div class="loader mb-4"></div>
-            <p class="text-gray-400 text-sm">Loading Channels...</p>
+    <main id="page-home" class="flex-1 flex flex-col overflow-hidden p-6">
+        
+        <div id="loading-indicator" class="flex flex-col items-center justify-center h-full">
+            <div class="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p class="text-xl text-gray-400">Loading Channels...</p>
         </div>
 
-        <div id="channel-container" class="hidden max-w-7xl mx-auto pb-10">
-            <!-- Categories -->
-            <div class="flex gap-2 overflow-x-auto pb-4 mb-2 no-scrollbar" id="category-filter">
-                <button class="bg-red-600 text-white px-4 py-1 rounded-full text-sm font-medium whitespace-nowrap">All</button>
+        <div id="channel-container" class="hidden flex flex-col h-full">
+            <div class="mb-6">
+                <h3 class="text-gray-400 text-sm font-bold mb-2 uppercase tracking-widest">Categories</h3>
+                <div id="category-row" class="flex gap-3 overflow-x-auto py-2 px-1 scroll-smooth">
+                    </div>
             </div>
 
-            <!-- Title -->
-            <div class="mb-4 mt-2">
-                <h2 class="text-xl font-bold text-white">Library...</h2>
-            </div>
-
-            <!-- Grid -->
-            <div id="grid-output" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                <!-- Channels injected here -->
+            <div class="flex-1 overflow-y-auto pb-10 scroll-smooth" id="grid-scroll-area">
+                <h2 id="grid-title" class="text-xl font-bold text-white mb-4 sticky top-0 bg-[#0f0f0f] z-10 py-2">All Channels</h2>
+                <div id="grid-output" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    </div>
             </div>
         </div>
     </main>
 
-    <!-- PLAYER PAGE (With Recommendations) -->
-    <main id="page-player" class="hidden-page fixed inset-0 z-50 bg-[#141414] overflow-y-auto">
-        <div class="max-w-6xl mx-auto min-h-screen flex flex-col">
-            
-            <!-- Player Header/Back -->
-            <div class="p-4 flex items-center gap-3 bg-black/40 backdrop-blur sticky top-0 z-40">
-                <button id="btn-back" class="text-white hover:text-red-500 bg-gray-800/50 p-2 rounded-full w-10 h-10 flex items-center justify-center transition-colors">
-                    <i class="fas fa-arrow-left"></i>
-                </button>
-                <h2 id="player-title" class="text-lg font-bold truncate flex-1">Channel Name</h2>
+    <main id="page-player" class="hidden-page fixed inset-0 z-50 bg-black flex flex-col">
+        
+        <div class="absolute top-0 left-0 right-0 p-6 z-20 bg-gradient-to-b from-black/90 to-transparent flex items-center gap-4 pointer-events-none">
+            <button id="btn-back" class="focusable pointer-events-auto bg-white/10 hover:bg-red-600 text-white w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md transition-colors border-2 border-transparent">
+                <i class="fas fa-arrow-left text-xl"></i>
+            </button>
+            <div>
+                <h2 id="player-title" class="text-2xl font-bold text-white drop-shadow-md">Channel Name</h2>
+                <p class="text-gray-300 text-sm drop-shadow-md">Live Stream</p>
             </div>
+        </div>
 
-            <!-- Video Container (Theater Mode) -->
-            <div class="w-full aspect-video bg-black shadow-2xl relative group">
-                <video-js id="video-player" class="vjs-default-skin vjs-big-play-centered" controls preload="auto"></video-js>
-            </div>
+        <div class="flex-1 relative bg-black">
+            <video-js id="video-player" class="vjs-default-skin vjs-big-play-centered" controls preload="auto"></video-js>
+        </div>
 
-            <!-- Recommendations Section -->
-            <div class="p-4 md:p-6 flex-1">
-                <h3 class="text-gray-300 font-semibold mb-4 border-l-4 border-red-600 pl-3">You might also like</h3>
-                
-                <!-- Suggested Grid -->
-                <div id="related-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <!-- Suggested channels injected here -->
-                </div>
-            </div>
-
+        <div id="recommendations-drawer" class="absolute bottom-0 left-0 right-0 bg-black/90 transform translate-y-[90%] hover:translate-y-0 transition-transform duration-300 z-30 p-6 border-t border-gray-800">
+             <div class="flex justify-between items-center mb-4">
+                <h3 class="text-gray-300 font-semibold">More Like This</h3>
+                <span class="text-xs text-gray-500">Press DOWN to view</span>
+             </div>
+             <div id="related-grid" class="grid grid-cols-4 gap-4">
+                 </div>
         </div>
     </main>
 
     <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+    <script src="https://unpkg.com/videojs-contrib-quality-levels@2.1.0/dist/videojs-contrib-quality-levels.min.js"></script>
 
     <script>
-        // --- CONFIGURATION ---
+        // --- CONFIG ---
         const PLAYLIST_URL = "https://piyashltd.github.io/all-in-one/index.m3u";
 
         // --- STATE ---
         const AppState = {
             channels: [],
-            proxyEnabled: localStorage.getItem('iptv_proxy') === 'true'
+            currentCategory: 'All',
+            proxyEnabled: localStorage.getItem('tv_proxy') === 'true',
+            currentFocus: null // For Remote Control Logic
         };
 
         // --- DOM ELEMENTS ---
@@ -188,15 +253,21 @@
             playerPage: document.getElementById('page-player'),
             loader: document.getElementById('loading-indicator'),
             channelContainer: document.getElementById('channel-container'),
-            mainGrid: document.getElementById('grid-output'),
-            categories: document.getElementById('category-filter'),
-            settingsModal: document.getElementById('settings-modal'),
+            grid: document.getElementById('grid-output'),
+            catRow: document.getElementById('category-row'),
+            settings: document.getElementById('settings-modal'),
+            proxyIcon: document.getElementById('proxy-icon'),
+            playerTitle: document.getElementById('player-title'),
             relatedGrid: document.getElementById('related-grid'),
-            playerTitle: document.getElementById('player-title')
+            recDrawer: document.getElementById('recommendations-drawer')
         };
 
-        // --- INITIALIZATION ---
-        window.addEventListener('DOMContentLoaded', fetchPlaylist);
+        // --- 1. INITIALIZATION & DATA ---
+        window.addEventListener('DOMContentLoaded', () => {
+            updateProxyUI();
+            fetchPlaylist();
+            setupRemoteControl(); // Start listening for keys
+        });
 
         async function fetchPlaylist() {
             try {
@@ -206,18 +277,17 @@
                 const res = await fetch(url);
                 if (!res.ok) throw new Error("Network Error");
                 const text = await res.text();
-                
                 parseM3U(text);
-
             } catch (e) {
-                console.error(e);
+                console.error("Playlist Load Error:", e);
                 if(!AppState.proxyEnabled) {
                     // Auto-retry with proxy once
                     AppState.proxyEnabled = true;
-                    localStorage.setItem('iptv_proxy', 'true');
+                    localStorage.setItem('tv_proxy', 'true');
+                    updateProxyUI();
                     fetchPlaylist(); 
                 } else {
-                    els.loader.innerHTML = `<p class="text-red-500 font-bold">Failed to load playlist.</p>`;
+                    els.loader.innerHTML = `<p class="text-red-500 text-xl font-bold">Failed to load playlist.</p>`;
                 }
             }
         }
@@ -247,100 +317,108 @@
                     }
                 }
             });
-
             renderHome();
         }
 
-        // --- RENDERING ---
+        // --- 2. RENDERING UI ---
         function renderHome() {
             els.loader.classList.add('hidden');
             els.channelContainer.classList.remove('hidden');
-            renderCategories();
-            renderGrid(AppState.channels, els.mainGrid);
-        }
-
-        function renderCategories() {
-            const groups = [...new Set(AppState.channels.map(c => c.group))].sort();
-            // Reset to just "All"
-            els.categories.innerHTML = '<button class="bg-red-600 text-white px-4 py-1 rounded-full text-sm font-medium whitespace-nowrap transition-colors focusable" onclick="filterGrid(\'All\', this)">All</button>';
             
-            groups.forEach(g => {
-                if(!g) return;
+            // Categories
+            const groups = ['All', ...new Set(AppState.channels.map(c => c.group).filter(Boolean))].sort();
+            els.catRow.innerHTML = '';
+            
+            groups.forEach((g, index) => {
                 const btn = document.createElement('button');
-                btn.className = 'bg-[#2a2a2a] text-gray-300 px-4 py-1 rounded-full text-sm font-medium whitespace-nowrap border border-gray-700 hover:bg-[#333] transition-colors focusable';
+                // tabindex="0" allows programmatic focus
+                btn.className = `focusable px-6 py-2 rounded-lg font-semibold whitespace-nowrap transition-colors border-2 border-transparent ${g === 'All' ? 'bg-red-600 text-white' : 'bg-gray-800 text-gray-300'}`;
                 btn.innerText = g;
-                btn.onclick = function() { filterGrid(g, this); };
-                els.categories.appendChild(btn);
+                btn.dataset.category = g;
+                btn.onclick = () => filterGrid(g, btn);
+                els.catRow.appendChild(btn);
+                
+                // Auto focus first category on load
+                if(index === 0) requestAnimationFrame(() => setFocus(btn));
             });
+
+            filterGrid('All');
         }
 
-        function filterGrid(category, btnElement) {
-            // UI Update
-            const buttons = els.categories.querySelectorAll('button');
-            buttons.forEach(b => {
-                b.className = 'bg-[#2a2a2a] text-gray-300 px-4 py-1 rounded-full text-sm font-medium whitespace-nowrap border border-gray-700 hover:bg-[#333] transition-colors focusable';
-            });
-            btnElement.className = 'bg-red-600 text-white px-4 py-1 rounded-full text-sm font-medium whitespace-nowrap border border-red-600 transition-colors focusable';
-
-            // Data Filter
-            const filtered = category === 'All' 
-                ? AppState.channels 
-                : AppState.channels.filter(c => c.group === category);
+        function filterGrid(category, activeBtn) {
+            AppState.currentCategory = category;
             
-            renderGrid(filtered, els.mainGrid);
-        }
+            // UI Update for Buttons
+            if(activeBtn) {
+                Array.from(els.catRow.children).forEach(b => {
+                    b.classList.remove('bg-red-600', 'text-white');
+                    b.classList.add('bg-gray-800', 'text-gray-300');
+                });
+                activeBtn.classList.remove('bg-gray-800', 'text-gray-300');
+                activeBtn.classList.add('bg-red-600', 'text-white');
+            }
 
-        function renderGrid(channels, container, isRelated = false) {
-            container.innerHTML = '';
-            const frag = document.createDocumentFragment();
+            document.getElementById('grid-title').innerText = category === 'All' ? 'All Channels' : category;
 
-            channels.forEach(ch => {
+            const filtered = category === 'All' ? AppState.channels : AppState.channels.filter(c => c.group === category);
+            
+            els.grid.innerHTML = '';
+            filtered.forEach(ch => {
                 const div = document.createElement('div');
-                div.className = 'grid-card group focusable';
-                div.tabIndex = 0; // Accessibility
+                div.className = 'focusable grid-card group relative';
+                div.tabIndex = 0; // Make focusable
                 
                 const logo = ch.logo || `https://via.placeholder.com/300x169/222/FFF?text=${ch.name.substring(0,1)}`;
                 
                 div.innerHTML = `
-                    <img src="${logo}" class="w-full h-full object-cover opacity-70 transition-opacity" loading="lazy" onerror="this.src='https://via.placeholder.com/300x169/222/FFF?text=TV'">
+                    <img src="${logo}" class="w-full h-full object-cover opacity-60 transition-opacity duration-300" loading="lazy" onerror="this.src='https://via.placeholder.com/300x169/222/FFF?text=TV'">
                     <div class="overlay">
-                        <h4 class="text-white text-xs md:text-sm font-bold truncate">${ch.name}</h4>
-                        ${!isRelated ? `<p class="text-[10px] text-gray-400 truncate">${ch.group}</p>` : ''}
+                        <h4 class="text-white font-bold text-lg truncate drop-shadow-md">${ch.name}</h4>
+                        <p class="text-gray-300 text-xs truncate">${ch.group}</p>
                     </div>
                 `;
-
-                // Click Action
-                div.onclick = () => playChannel(ch);
-                // Keyboard Action
-                div.onkeydown = (e) => { if(e.key === 'Enter') playChannel(ch); };
-
-                frag.appendChild(div);
+                
+                div.onclick = () => openPlayer(ch);
+                els.grid.appendChild(div);
             });
-            container.appendChild(frag);
         }
 
-        // --- PLAYER LOGIC ---
+        // --- 3. PLAYER & QUALITY SELECTOR ---
         let player;
+        let qualityListElem;
 
-        function playChannel(channel) {
-            // 1. Switch Views
+        function openPlayer(channel) {
             els.home.classList.add('hidden-page');
             els.playerPage.classList.remove('hidden-page');
             els.playerTitle.innerText = channel.name;
 
-            // 2. Initialize VideoJS
             if(!player) {
                 player = videojs('video-player', { 
                     fluid: true, 
                     html5: { vhs: { overrideNative: true } },
-                    autoplay: true
+                    inactivityTimeout: 3000,
+                    autoplay: true,
+                    controlBar: {
+                        children: [
+                            'playToggle',
+                            'volumePanel',
+                            'currentTimeDisplay',
+                            'timeDivider',
+                            'durationDisplay',
+                            'progressControl',
+                            'liveDisplay',
+                            'fullscreenToggle',
+                        ]
+                    }
                 });
+                
+                // Initialize Quality Menu Logic Once
+                setupQualityMenu(player);
             }
 
-            // 3. Set Source
             let src = channel.url;
             if(AppState.proxyEnabled && !src.includes('corsproxy')) {
-                src = `https://corsproxy.io/?${encodeURIComponent(channel.url)}`;
+                src = `https://corsproxy.io/?${encodeURIComponent(src)}`;
             }
 
             player.src({
@@ -349,64 +427,246 @@
             });
             player.play();
 
-            // 4. Generate & Render Recommendations (The Requirement)
-            generateRecommendations(channel);
-            
-            // Scroll to top of player page
-            els.playerPage.scrollTop = 0;
+            // Focus the back button initially
+            setFocus(document.getElementById('btn-back'));
+
+            // Load Recommendations
+            loadRecommendations(channel);
         }
 
-        function generateRecommendations(currentChannel) {
-            // Filter by same group first
-            let related = AppState.channels.filter(c => c.group === currentChannel.group && c.url !== currentChannel.url);
+        function setupQualityMenu(playerInstance) {
+            const controlBar = playerInstance.controlBar;
             
-            // If fewer than 8, fill with random channels
-            if (related.length < 8) {
-                const others = AppState.channels.filter(c => c.group !== currentChannel.group);
-                // Shuffle others
-                const randomFill = others.sort(() => 0.5 - Math.random()).slice(0, 8 - related.length);
-                related = [...related, ...randomFill];
+            // 1. Create UI
+            const menuContainer = document.createElement("div");
+            menuContainer.className = "vjs-quality-menu vjs-control vjs-button";
+            
+            const btn = document.createElement("button");
+            btn.className = "vjs-quality-button";
+            btn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L3.16 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>`;
+            
+            const list = document.createElement("div");
+            list.className = "vjs-quality-list";
+            qualityListElem = list; // Store reference
+            
+            menuContainer.appendChild(btn);
+            menuContainer.appendChild(list);
+            
+            // Insert before Fullscreen
+            const fsToggle = controlBar.getChild('fullscreenToggle');
+            controlBar.el().insertBefore(menuContainer, fsToggle ? fsToggle.el() : null);
+
+            // Toggle Action
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const isVisible = list.style.display === "block";
+                list.style.display = isVisible ? "none" : "block";
+                if(!isVisible) {
+                    // Focus first item when opening
+                    setTimeout(() => {
+                        const firstItem = list.querySelector('.vjs-quality-item');
+                        if(firstItem) setFocus(firstItem);
+                    }, 100);
+                }
+            };
+
+            // 2. Logic with 'videojs-contrib-quality-levels'
+            const qualityLevels = playerInstance.qualityLevels();
+            
+            function renderQualityList() {
+                list.innerHTML = "";
+                
+                // Auto Option
+                const autoItem = document.createElement("div");
+                // tabindex 0 is crucial for remote focus
+                autoItem.tabIndex = 0; 
+                const isAuto = qualityLevels.levels_.every(l => l.enabled);
+                autoItem.className = `vjs-quality-item focusable ${isAuto ? 'active' : ''}`;
+                autoItem.innerHTML = `<span>Auto</span> ${isAuto ? '<i class="fas fa-check text-xs"></i>' : ''}`;
+                
+                autoItem.onclick = () => {
+                    qualityLevels.levels_.forEach(l => l.enabled = true);
+                    list.style.display = "none";
+                    renderQualityList();
+                    setFocus(document.getElementById('video-player')); // Return focus to player
+                };
+                
+                // Custom Keyboard Enter Support
+                autoItem.onkeydown = (e) => { if(e.key === 'Enter') autoItem.click(); };
+                
+                list.appendChild(autoItem);
+
+                // Level Options
+                // Clone and sort high to low
+                const sortedLevels = [...qualityLevels.levels_].sort((a, b) => b.height - a.height);
+                
+                sortedLevels.forEach(level => {
+                    const item = document.createElement("div");
+                    item.tabIndex = 0;
+                    const isSelected = !isAuto && level.enabled;
+                    item.className = `vjs-quality-item focusable ${isSelected ? 'active' : ''}`;
+                    item.innerHTML = `<span>${level.height}p</span> ${isSelected ? '<i class="fas fa-check text-xs"></i>' : ''}`;
+                    
+                    item.onclick = () => {
+                        qualityLevels.levels_.forEach(l => l.enabled = (l.height === level.height));
+                        list.style.display = "none";
+                        renderQualityList();
+                        setFocus(document.getElementById('video-player'));
+                    };
+                    
+                    item.onkeydown = (e) => { if(e.key === 'Enter') item.click(); };
+                    
+                    list.appendChild(item);
+                });
             }
 
-            // Shuffle results slightly so it's not always alphabetical
-            related = related.sort(() => 0.5 - Math.random()).slice(0, 8);
-
-            renderGrid(related, els.relatedGrid, true);
+            // Listeners
+            qualityLevels.on('addqualitylevel', renderQualityList);
+            qualityLevels.on('change', () => { /* Optional: Update Auto UI dynamically */ });
+            
+            renderQualityList(); // Initial render
         }
 
         function closePlayer() {
             if(player) player.pause();
             els.playerPage.classList.add('hidden-page');
             els.home.classList.remove('hidden-page');
+            // Focus back to grid
+            const firstCard = els.grid.querySelector('.grid-card');
+            if(firstCard) setFocus(firstCard);
         }
 
-        // --- SETTINGS & NAV ---
-        document.getElementById('btn-back').onclick = closePlayer;
-        
-        document.getElementById('btn-settings').onclick = () => {
-            els.settingsModal.classList.remove('hidden');
-            document.getElementById('setting-cors').checked = AppState.proxyEnabled;
-        };
-        
-        document.getElementById('close-settings').onclick = () => els.settingsModal.classList.add('hidden');
-        
-        document.getElementById('setting-cors').onchange = (e) => {
-            AppState.proxyEnabled = e.target.checked;
-            localStorage.setItem('iptv_proxy', e.target.checked);
-        };
+        function loadRecommendations(current) {
+            els.relatedGrid.innerHTML = '';
+            const others = AppState.channels.filter(c => c.url !== current.url);
+            const random = others.sort(() => 0.5 - Math.random()).slice(0, 4);
+            
+            random.forEach(ch => {
+                const div = document.createElement('div');
+                div.className = 'focusable grid-card group relative border border-gray-800';
+                div.tabIndex = 0;
+                div.innerHTML = `
+                     <img src="${ch.logo || ''}" class="w-full h-full object-cover opacity-50" onerror="this.style.display='none'">
+                     <div class="overlay"><h4 class="text-white text-xs font-bold">${ch.name}</h4></div>
+                `;
+                div.onclick = () => openPlayer(ch);
+                els.relatedGrid.appendChild(div);
+            });
+        }
 
+        // --- 4. REMOTE CONTROL / SPATIAL NAVIGATION SYSTEM ---
+        
+        function setFocus(el) {
+            if(!el) return;
+            // Remove old focus
+            document.querySelectorAll('.focused').forEach(e => e.classList.remove('focused'));
+            el.focus();
+            el.classList.add('focused');
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            AppState.currentFocus = el;
+        }
+
+        function setupRemoteControl() {
+            document.addEventListener('keydown', (e) => {
+                // Handle Back
+                if (e.key === 'Escape' || e.key === 'Backspace' || e.keyCode === 10009 /* TV Back */) {
+                    if (!els.playerPage.classList.contains('hidden-page')) {
+                        // If quality menu is open, close it first
+                        if(qualityListElem && qualityListElem.style.display === 'block') {
+                            qualityListElem.style.display = 'none';
+                            return;
+                        }
+                        closePlayer();
+                    } else if (!els.settings.classList.contains('hidden')) {
+                        els.settings.classList.add('hidden');
+                        setFocus(document.getElementById('btn-settings'));
+                    }
+                    return;
+                }
+
+                // Handle Arrows
+                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                    e.preventDefault();
+                    navigate(e.key);
+                }
+                
+                // Handle Enter on focused elements that are divs (buttons work natively)
+                if (e.key === 'Enter') {
+                    const active = document.activeElement;
+                    if(active && active.onclick) active.click();
+                }
+            });
+        }
+
+        function navigate(direction) {
+            const current = document.activeElement;
+            // Collect all currently visible focusable elements
+            const allFocusable = Array.from(document.querySelectorAll('.focusable')).filter(el => {
+                return el.offsetParent !== null; // Check visibility
+            });
+
+            if (allFocusable.length === 0) return;
+            if (!allFocusable.includes(current)) {
+                setFocus(allFocusable[0]);
+                return;
+            }
+
+            const currRect = current.getBoundingClientRect();
+            let bestCandidate = null;
+            let minDistance = Infinity;
+
+            allFocusable.forEach(el => {
+                if (el === current) return;
+
+                const targetRect = el.getBoundingClientRect();
+                
+                // Calculate direction deltas
+                const dx = (targetRect.left + targetRect.width/2) - (currRect.left + currRect.width/2);
+                const dy = (targetRect.top + targetRect.height/2) - (currRect.top + currRect.height/2);
+
+                let isDirectionCorrect = false;
+                if (direction === 'ArrowRight') isDirectionCorrect = dx > 0 && Math.abs(dy) < Math.abs(dx);
+                if (direction === 'ArrowLeft') isDirectionCorrect = dx < 0 && Math.abs(dy) < Math.abs(dx);
+                if (direction === 'ArrowDown') isDirectionCorrect = dy > 0 && Math.abs(dx) < Math.abs(dy);
+                if (direction === 'ArrowUp') isDirectionCorrect = dy < 0 && Math.abs(dx) < Math.abs(dy);
+
+                if (isDirectionCorrect) {
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        bestCandidate = el;
+                    }
+                }
+            });
+
+            if (bestCandidate) setFocus(bestCandidate);
+        }
+
+        // --- 5. SETTINGS UTILS ---
+        document.getElementById('btn-settings').onclick = () => {
+            els.settings.classList.remove('hidden');
+            setFocus(document.getElementById('toggle-proxy'));
+        };
+        document.getElementById('close-settings').onclick = () => {
+            els.settings.classList.add('hidden');
+            setFocus(document.getElementById('btn-settings'));
+        };
+        document.getElementById('btn-back').onclick = closePlayer;
+
+        document.getElementById('toggle-proxy').onclick = () => {
+            AppState.proxyEnabled = !AppState.proxyEnabled;
+            localStorage.setItem('tv_proxy', AppState.proxyEnabled);
+            updateProxyUI();
+        };
+        
         document.getElementById('btn-reload').onclick = () => location.reload();
 
-        // Keyboard Back
-        document.addEventListener('keydown', (e) => {
-            if(e.key === 'Escape' || e.key === 'Backspace') {
-                if(!els.playerPage.classList.contains('hidden-page')) closePlayer();
-                else els.settingsModal.classList.add('hidden');
-            }
-        });
+        function updateProxyUI() {
+            els.proxyIcon.className = AppState.proxyEnabled 
+                ? 'fas fa-toggle-on text-2xl text-red-600' 
+                : 'fas fa-toggle-off text-2xl text-gray-500';
+        }
 
     </script>
 </body>
 </html>
-
-
